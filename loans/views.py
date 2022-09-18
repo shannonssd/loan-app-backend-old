@@ -27,17 +27,19 @@ def get_listings_or_add_new_loan(request):
         elif request.method == 'POST':
             # Use a database transaction as data is being saved across two tables
             with transaction.atomic():
+                print('POST working')
                 loan_amount_int = int(request.data['loan_amount'])
                 loan_term_int = int(request.data['loan_term'])
                 interest_rate_int = float(request.data['interest_rate'])
-                loan_date =   datetime.today()
+                loan_month = request.data['loan_month']
+                loan_year = request.data['loan_year']
                 new_loan = LoanList(
                     loan_amount = loan_amount_int, 
                     loan_term = loan_term_int, 
                     interest_rate = interest_rate_int, 
                     ) 
                 new_loan.save()
-                return calculate_repayment(loan_amount_int, loan_term_int, interest_rate_int, loan_date, new_loan)
+                return calculate_repayment(loan_amount_int, loan_term_int, interest_rate_int, loan_month, loan_year, new_loan)
                 
     except Exception as err:
         print(str(err))
@@ -51,6 +53,7 @@ def get_listings_or_add_new_loan(request):
 def get_modifiy_delete_loan(request, pk):
     try:
         if request.method == 'GET':
+            print(pk)
             loan_details = LoanList.objects.get(id=pk)
             loan_serializer =  LoanListSerialzier(loan_details).data
             repayment_details = RepaymentSchedule.objects.filter(loan_id_id__id = pk)
@@ -66,7 +69,9 @@ def get_modifiy_delete_loan(request, pk):
             repayment_list.delete()
             loan_listing = LoanList.objects.get(id=pk)
             loan_listing.delete()
-            return Response('done!')
+            loan_list = LoanList.objects.all()
+            loan_list_serializer = LoanListSerialzier(loan_list, many=True).data
+            return Response(loan_list_serializer)
 
         elif request.method == 'PUT':
             # Use a database transaction as data is being saved across two tables
@@ -78,14 +83,15 @@ def get_modifiy_delete_loan(request, pk):
                 loan_amount_int = int(request.data['loan_amount'])
                 loan_term_int = int(request.data['loan_term'])
                 interest_rate_int = float(request.data['interest_rate'])
-                loan_date =   datetime.today()
+                loan_month = request.data['loan_month']
+                loan_year = request.data['loan_year']
                 LoanList.objects.filter(id=pk).update(
                     loan_amount = loan_amount_int, 
                     loan_term = loan_term_int, 
                     interest_rate = interest_rate_int, 
                     )
                 loan_details = LoanList.objects.get(id=pk)
-                return calculate_repayment(loan_amount_int, loan_term_int, interest_rate_int, loan_date, loan_details)
+                return calculate_repayment(loan_amount_int, loan_term_int, interest_rate_int, loan_month, loan_year, loan_details)
 
     except Exception as err:
         print(str(err))
@@ -141,8 +147,17 @@ def filter_loans(request):
         print(str(err))
         return Response(str(err))
 
+# Retrieve loan information for editting
+@api_view(['GET'])
+def get_loan_data(request, pk):
+    loan_details = LoanList.objects.get(id=pk)
+    loan_serializer =  LoanListSerialzier(loan_details).data
+    return Response({"loanObject": loan_serializer })
+
 # Helper function to calculate and store repayment schedule in db
-def calculate_repayment(loan_amount, loan_term, interest_rate_percentage, loan_date, loan):
+def calculate_repayment(loan_amount, loan_term, interest_rate_percentage, loan_month, loan_year, loan):
+    print('calc started')
+    print(loan_month, loan_year)
     interest_rate = interest_rate_percentage / 100
     pmt = loan_amount * (interest_rate/12) / (1 - ((1 + (interest_rate/12)) ** (-12 * loan_term)))
     no_of_months = loan_term * 12
@@ -157,7 +172,7 @@ def calculate_repayment(loan_amount, loan_term, interest_rate_percentage, loan_d
         repayment_list.append(RepaymentSchedule(
             loan_id = loan,
             payment_no = x,
-            date =  loan_date + relativedelta.relativedelta(months=x),
+            date =  datetime(loan_year, int(loan_month), 1) + relativedelta.relativedelta(months=x),
             payment_amount = pmt,
             prinicipal = prinicipal,
             interest = monthly_interest,
@@ -165,12 +180,15 @@ def calculate_repayment(loan_amount, loan_term, interest_rate_percentage, loan_d
         ))
 
     RepaymentSchedule.objects.bulk_create(repayment_list)
-    added_repayments = RepaymentSchedule.objects.filter(loan_id_id = loan)
-    repayments_serializer = RepaymentScheduleSerialzier(added_repayments, many=True).data
+    # added_repayments = RepaymentSchedule.objects.filter(loan_id_id = loan)
+    # repayments_serializer = RepaymentScheduleSerialzier(added_repayments, many=True).data
     loan_serializer =  LoanListSerialzier(loan).data
-    obj = {
-        'loan': loan_serializer,
-        'repayment list': repayments_serializer
-    }
-    return Response(obj)
+    print(loan_serializer)
+    pk = loan_serializer['id']
+    print(pk)
+    # obj = {
+    #     'loan': loan_serializer,
+    #     'repayment list': repayments_serializer
+    # }
+    return Response(pk)
 
