@@ -6,10 +6,10 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from .serializers import LoanListSerialzier, RepaymentScheduleSerialzier
 
-#### 3. On redo: principal spelling
-#### 4. On redo: interest rate constraint
-#### 5. Commnets
-#### 7. CORS
+#### 1. principal spelling
+#### 2. interest rate constraint
+#### 3. adding date / month to loan list db table
+#### 4. Commnets
 
 
 
@@ -100,6 +100,7 @@ def get_modifiy_delete_loan(request, pk):
 # Filter and return loan listings based on user parameters
 @api_view(['GET'])
 def filter_loans(request):
+    print('working', request.GET)
     try:
         if request.GET['loan_amount_lower'] == 'null':
             loan_amount_lower = 1000 
